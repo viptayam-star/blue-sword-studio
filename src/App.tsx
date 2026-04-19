@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import MobileWarning from "@/components/MobileWarning";
+import RatingModal from "@/components/RatingModal";
 import Home from "./pages/Home";
 import Portfolio from "./pages/Portfolio";
 import Packages from "./pages/Packages";
@@ -34,6 +35,7 @@ const AppContent = () => {
       </main>
       <Footer />
       <MobileWarning />
+      <RatingModal />
     </div>
   );
 };
