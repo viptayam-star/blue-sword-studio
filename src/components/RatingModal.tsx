@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, X } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -11,20 +11,65 @@ const RatingModal = () => {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setOpen(true), 10000);
-    return () => clearTimeout(timer);
+
+    return () => {
+      clearTimeout(timer);
+
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+    };
   }, []);
 
+  const resetModalState = () => {
+    setOpen(false);
+    setSelected(0);
+    setHovered(0);
+    setIsSubmitting(false);
+  };
+
   const handleSelect = (rating: number) => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
     setSelected(rating);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+
     const audio = new Audio(rating === 5 ? sound5Stars : soundLow);
-    audio.play().catch(() => {});
-    setTimeout(() => {
-      setOpen(false);
-      setSelected(0);
-      setHovered(0);
+    audioRef.current = audio;
+
+    audio.onended = () => {
+      audioRef.current = null;
+    };
+
+    audio.onerror = () => {
+      audioRef.current = null;
+      setIsSubmitting(false);
+    };
+
+    audio.play().catch(() => {
+      audioRef.current = null;
+      setIsSubmitting(false);
+    });
+
+    closeTimerRef.current = setTimeout(() => {
+      resetModalState();
     }, 600);
   };
 
@@ -38,13 +83,11 @@ const RatingModal = () => {
           exit={{ opacity: 0 }}
           dir={isRTL ? 'rtl' : 'ltr'}
         >
-          {/* Backdrop */}
           <motion.div
             className="absolute inset-0 bg-background/80 backdrop-blur-md"
-            onClick={() => setOpen(false)}
+            onClick={resetModalState}
           />
 
-          {/* Modal */}
           <motion.div
             className="relative z-10 w-full max-w-md rounded-3xl bg-card border border-border/50 shadow-2xl p-8 md:p-10"
             initial={{ scale: 0.85, opacity: 0, y: 20 }}
@@ -53,7 +96,7 @@ const RatingModal = () => {
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
           >
             <button
-              onClick={() => setOpen(false)}
+              onClick={resetModalState}
               className="absolute top-4 end-4 p-2 rounded-full hover:bg-muted transition-colors"
               aria-label="Close"
             >
@@ -85,15 +128,17 @@ const RatingModal = () => {
                   return (
                     <motion.button
                       key={star}
-                      onMouseEnter={() => setHovered(star)}
-                      onMouseLeave={() => setHovered(0)}
+                      type="button"
+                      onMouseEnter={() => !isSubmitting && setHovered(star)}
+                      onMouseLeave={() => !isSubmitting && setHovered(0)}
                       onClick={() => handleSelect(star)}
-                      whileHover={{ scale: 1.15 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={isSubmitting ? undefined : { scale: 1.15 }}
+                      whileTap={isSubmitting ? undefined : { scale: 0.95 }}
                       animate={selected === star ? { scale: [1, 1.4, 1] } : {}}
                       transition={{ duration: 0.4 }}
-                      className="p-1 focus:outline-none"
+                      className="p-1 focus:outline-none disabled:pointer-events-none disabled:opacity-70"
                       aria-label={`${star} stars`}
+                      disabled={isSubmitting}
                     >
                       <Star
                         className={`w-10 h-10 md:w-12 md:h-12 transition-colors duration-200 ${
